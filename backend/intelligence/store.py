@@ -84,3 +84,31 @@ def finish(job, error=None, terminal=False):
 def jobs():
     with broker() as db:
         return [dict(r) for r in db.execute('SELECT id,queue,event,status,attempts,error,created FROM jobs ORDER BY created DESC LIMIT 100')]
+
+
+def enqueue_record_job(queue,event,payload):
+    """One pending/running operation for a domain record, including repeat clicks."""
+    with broker() as db:
+        db.execute('BEGIN IMMEDIATE')
+        current=db.execute("SELECT id FROM jobs WHERE queue=? AND status IN ('pending','running') AND json_extract(payload,'$.domain')=? AND json_extract(payload,'$.id')=? LIMIT 1",(queue,payload['domain'],payload['id'])).fetchone()
+        if current:return current['id']
+        key=queue+':'+str(uuid.uuid4())
+        db.execute('INSERT INTO jobs(id,queue,event,payload,available,created) VALUES (?,?,?,?,?,?)',(key,queue,event+'.v1',json.dumps(payload),time.time(),time.time()))
+    return key
+
+
+def renew(job,lease_seconds=180):
+    with broker() as db:
+        result=db.execute("UPDATE jobs SET lease=? WHERE id=? AND attempts=? AND status='running'",(time.time()+lease_seconds,job['id'],job['attempts']))
+        return result.rowcount==1
+
+
+def patch(domain,key,fields):
+    """Update worker-owned fields without replacing a concurrent presentation."""
+    with connect(domain) as db:
+        db.execute('BEGIN IMMEDIATE')
+        row=db.execute('SELECT value FROM documents WHERE id=?',(key,)).fetchone()
+        if not row:raise KeyError(key)
+        value={**json.loads(row['value']),**fields}
+        db.execute('UPDATE documents SET value=? WHERE id=?',(json.dumps(value),key))
+    return value

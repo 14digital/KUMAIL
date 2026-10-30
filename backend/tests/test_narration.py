@@ -21,7 +21,7 @@ def configured(monkeypatch):
     monkeypatch.setenv('ELEVENLABS_VOICE_ID','test-voice')
 
 def record(status='unavailable'):
-    return store.put('briefings','b',{'id':'b','text':'Written briefing','articles':[{'id':'a'}],'audio_status':status})
+    return store.put('briefings','b',{'id':'b','text':'Written briefing','articles':[{'id':'a'}],'audio_status':status,'presentation_version':'spoken-v1','narration_script':'Conversational spoken fixture'})
 
 def test_retry_reports_unloaded_credentials_without_echoing_them(client):
     record()

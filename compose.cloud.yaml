@@ -16,6 +16,10 @@ services:
     build: *cloud-build
     environment: *cloud-env
     volumes: [/etc/ssl/certs/ca-certificates.crt:/run/cloud-ca.pem:ro]
+  editor:
+    build: *cloud-build
+    environment: *cloud-env
+    volumes: [/etc/ssl/certs/ca-certificates.crt:/run/cloud-ca.pem:ro]
   voice:
     build: *cloud-build
     environment: *cloud-env

@@ -1,7 +1,7 @@
 param([string]$RootDirectory, [switch]$LibraryOnly)
 $ErrorActionPreference = 'Stop'
 $script:GitExe = $null
-$script:BootstrapFiles = @('Update My Intelligence.cmd', 'scripts/update-windows.ps1')
+$script:BootstrapFiles = @('Update My Intelligence.cmd', 'Update KUMAIL.cmd', 'scripts/update-windows.ps1')
 
 function Find-Git {
     $command = Get-Command git -ErrorAction SilentlyContinue

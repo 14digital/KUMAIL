@@ -25,6 +25,6 @@ with httpx.Client(base_url='http://127.0.0.1:8000',headers=headers,timeout=10,tr
     assert client.get('/api/dashboard').status_code==200
 with httpx.Client(base_url='http://127.0.0.1:3000',trust_env=False,timeout=30) as web:
     response=web.get('/')
-    assert response.status_code==200 and 'Clarity in a' in response.text
+    assert response.status_code==200 and 'KUMAIL' in response.text and 'Private access key' in response.text
     assert web.get('/api/dashboard',headers=headers).status_code==200
 print('PASS: authentication, authorised ingestion, async research worker, source provenance, deletion, dashboard and API gateway')

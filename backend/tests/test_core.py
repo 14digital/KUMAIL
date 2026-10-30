@@ -83,7 +83,7 @@ def test_voice_failure_preserves_text(monkeypatch):
     monkeypatch.setenv('ELEVENLABS_VOICE_ID','test')
     def fail(*a,**kw):raise RuntimeError('provider unavailable')
     monkeypatch.setattr(pipeline.httpx.Client,'post',fail)
-    store.put('briefings','a',{'text':'written'})
+    store.put('briefings','a',{'text':'written','presentation_version':'spoken-v1','narration_script':'Spoken fixture'})
     with pytest.raises(RuntimeError):pipeline.narrate({'domain':'briefings','id':'a','text':'written'})
     assert store.get('briefings','a')['text']=='written'
     assert store.get('briefings','a')['audio_status']=='failed'

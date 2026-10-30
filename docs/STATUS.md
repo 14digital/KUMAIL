@@ -1,4 +1,13 @@
-# Implementation status
+# KUMAIL implementation status
+
+## Current listening release
+
+The UI is now a listening room with KUMAIL branding, one primary Play control, optional headline/evidence reading and settings/library tucked away. The separate editor worker creates original conversational scripts with source-attributed chapter metadata. Narration never uses the analyst record directly. Edition-specific duration targets are adjustable; thin evidence produces a shorter edition or labelled headline fallback. Audio is split without truncation, cached by script and delivered as ordered chapters.
+
+Explicit microphone interruption, typed questions, current-story context, spoken answers and chapter/position resume are implemented. Browser tests use controlled fixtures and a simulated speech recogniser; real Windows microphone behaviour and live provider editorial quality still require the user's acceptance check. There is no wake-word listener. The existing Windows updater remains compatible, with KUMAIL-named launcher aliases added.
+
+See [the latest brief comparison](KUMAIL_GAP_REVIEW.md) for the complete outstanding autonomy, delivery, memory, research and reliability gaps. This is not the complete autonomous assistant.
+
 
 ## Working foundation
 

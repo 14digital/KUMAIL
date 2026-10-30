@@ -49,16 +49,7 @@ def provider_error(response):
 
 def queue_audio(domain, record_id, text):
     """Single active narration request per record; repeat clicks reuse its job."""
-    import json,time
-    with store.broker() as db:
-        db.execute('BEGIN IMMEDIATE')
-        current=db.execute("SELECT id FROM jobs WHERE queue='voice' AND status IN ('pending','running') AND json_extract(payload,'$.domain')=? AND json_extract(payload,'$.id')=? LIMIT 1",(domain,record_id)).fetchone()
-        if current:
-            return current['id']
-        key='voice-retry:'+str(uuid.uuid4())
-        payload=json.dumps({'domain':domain,'id':record_id,'text':text})
-        db.execute("INSERT INTO jobs(id,queue,event,payload,available,created) VALUES (?,'voice','audio.generation.requested.v1',?,?,?)",(key,payload,time.time(),time.time()))
-    return key
+    return store.enqueue_record_job('answer_voice' if domain=='answers' else 'voice','audio.generation.requested',{'domain':domain,'id':record_id,'text':text})
 
 
 def recover_unavailable_audio():
@@ -74,7 +65,8 @@ def recover_unavailable_audio():
         record=eligible[0]
         if record.get('audio_status') not in ('unavailable','not_requested'):
             continue
-        job_id=queue_audio(domain,record['id'],record['text'])
-        store.put(domain,record['id'],{**record,'audio_status':'queued','audio_reason':'Narration queued after loading ElevenLabs configuration.','audio_job_id':job_id})
+        from .editorial import PRESENTATION_VERSION,queue_presentation
+        job_id=queue_audio(domain,record['id'],record['narration_script']) if record.get('presentation_version')==PRESENTATION_VERSION and record.get('narration_script') else queue_presentation(domain,record['id'],force=True)
+        store.patch(domain,record['id'],{'audio_status':'queued','audio_reason':'Narration queued after loading ElevenLabs configuration.','audio_job_id':job_id})
         recovered.append(job_id)
     return recovered

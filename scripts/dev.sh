@@ -13,7 +13,7 @@ pids=()
 cleanup() { for pid in "${pids[@]}"; do kill "$pid" 2>/dev/null || true; done; }
 trap cleanup EXIT INT TERM
 .venv/bin/uvicorn intelligence.api:app --host 0.0.0.0 --port 8000 & pids+=("$!")
-for role in scheduler news voice research deep opportunities; do
+for role in scheduler news editor voice research deep opportunities; do
   SERVICE_ROLE="$role" .venv/bin/python -m intelligence.worker & pids+=("$!")
 done
 (cd web && npm run dev) & pids+=("$!")

@@ -24,6 +24,10 @@ services:
     <<: *backend
     command: [python, -m, intelligence.worker]
     environment: {STATE_DIR: /data, SERVICE_ROLE: scheduler}
+  editor:
+    <<: *backend
+    command: [python, -m, intelligence.worker]
+    environment: {STATE_DIR: /data, SERVICE_ROLE: editor}
   voice:
     <<: *backend
     command: [python, -m, intelligence.worker]

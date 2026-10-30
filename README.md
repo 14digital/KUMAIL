@@ -1,12 +1,24 @@
-# My Intelligence
+# KUMAIL
 
 A private, source-aware intelligence desk. This repository contains a working **foundation MVP**, not the complete production system in the master specification. See [implementation status](docs/STATUS.md) for the exact boundary.
+
+## The listening experience
+
+KUMAIL opens on a single listening screen. Press Play for the latest meaningful edition. Headlines appear as one short paragraph; source links, optional summaries and the written record live behind **Headlines & evidence**. Publisher configuration, history and diagnostics are under the settings control.
+
+A separate editorial worker creates conversational narration from the source evidence. It never sends the written analyst record directly to ElevenLabs. Morning/evening editions target nine minutes, midday four and afternoon six; manual editions target ten. Targets are adjustable under Preferences. Sparse evidence produces a shorter honest edition, never padded content. A headline-only fallback is labelled if OpenAI cannot produce a valid listening script.
+
+Use **Interrupt & ask** or press **M** to pause immediately and speak one question; typing remains available. The current story and briefing are attached to the question. Answers are spoken when ready after that explicit request. **Resume briefing** returns to the saved chapter and position. Supported spoken playback commands include pause, resume briefing, next story and repeat that. The microphone is explicitly activated, browser-dependent and off otherwise; this is not always-listening wake-word detection or full-duplex acoustic barge-in. Browser speech recognition may use an online provider.
+
+Scheduled readiness never starts playback. Audio is chaptered and cached, and long scripts are split without silent truncation. An old report is converted to the listening format when requested; its written evidence is retained.
+
+The [JARVIS brief comparison](docs/KUMAIL_GAP_REVIEW.md) records what is still missing from the autonomous assistant vision.
 
 ## Windows: start with Docker Desktop
 
 1. Start Docker Desktop and wait for its engine to run. If it asks for a WSL update, run `wsl --update` in PowerShell and restart Windows.
 2. On this GitHub page, select **Code → Download ZIP**, then extract the ZIP in Windows File Explorer.
-3. Open the extracted folder and double-click **Start My Intelligence.cmd**.
+3. Open the extracted folder and double-click **Start KUMAIL.cmd**.
 4. Keep the command window open while the images build. The launcher opens the dashboard and your local `.env` in Notepad.
 5. Copy the value after `APP_TOKEN=` into the dashboard access-key field. Keep that file private.
 
