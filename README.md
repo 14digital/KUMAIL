@@ -12,6 +12,12 @@ A private, source-aware intelligence desk. This repository contains a working **
 
 The launcher creates a fresh random access key on your computer. No paid API key is needed to open the app. Provider features require separate configuration. The Windows launcher has not been executed on a Windows machine during this build; the Docker images and private-network routing were tested on Linux.
 
+## Windows: update without downloading ZIPs again
+
+Download **[Update My Intelligence.cmd](https://github.com/14digital/KUMAIL/raw/refs/heads/main/Update%20My%20Intelligence.cmd)** once and save it **in your existing app folder**, beside Start My Intelligence.cmd. Double-click it for this and future updates. Git may install once and GitHub may ask for browser sign-in. The updater migrates an unchanged ZIP installation to Git, preserves `.env` and the existing data volume, stops on local code edits and builds only affected application images. It is self-contained; no second file download is needed.
+
+See [Windows updates](docs/WINDOWS_UPDATES.md) for migration safeguards, retry behaviour and testing limits. Updating saved keys only requires restarting the containers, not downloading code.
+
 ## Run locally
 
 Prerequisites: Python 3.12+, uv, Node.js 22+ and npm.
@@ -43,9 +49,11 @@ After import, refresh **Sources**, then click **Prepare briefing**. Audio still 
 ## Containers
 
 ```sh
-docker compose up --build -d
+docker compose build api web
+docker compose up -d --no-build
 # Managed Codex environment, preserving proxy and TLS trust:
-docker compose -f compose.yaml -f compose.cloud.yaml up --build -d
+docker compose -f compose.yaml -f compose.cloud.yaml build api web
+docker compose -f compose.yaml -f compose.cloud.yaml up -d --no-build
 ```
 
 Use HTTPS termination and restrict access before exposing the application outside the host. Compose binds public-facing ports to loopback. Never publish the development server directly to the Internet.

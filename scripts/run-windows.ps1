@@ -14,7 +14,9 @@ if (-not (Test-Path '.env')) {
     $config = $template -replace '(?m)^APP_TOKEN=.*$', ('APP_TOKEN=' + $token)
     [System.IO.File]::WriteAllText((Join-Path (Get-Location) '.env'), $config)
 }
-docker compose up --build -d
+docker compose build api web
+if ($LASTEXITCODE -ne 0) { throw 'Docker build failed. Check the error above.' }
+docker compose up -d --no-build
 if ($LASTEXITCODE -ne 0) { throw 'Docker startup failed. Check the error above.' }
 Write-Host 'Waiting for the dashboard...'
 $ready = $false
