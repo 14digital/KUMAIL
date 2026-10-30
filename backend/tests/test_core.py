@@ -143,3 +143,11 @@ def test_real_feed_parsing_without_unapproved_links(monkeypatch):
     assert articles[0]['text']=='Supported feed excerpt.'
     assert articles[0]['publisher']=='Fixture publisher'
     assert store.get('articles',articles[0]['id'])['retrieved_at']
+
+def test_atom_iso_dates_are_eligible(monkeypatch):
+    stamp=datetime.now(timezone.utc).isoformat()
+    xml=f'''<feed xmlns="http://www.w3.org/2005/Atom"><title>Fixture Atom</title><entry><id>urn:fixture:1</id><title>Atom story</title><link href="https://publisher.example/story"/><updated>{stamp}</updated><summary>Current Atom evidence.</summary></entry></feed>'''
+    monkeypatch.setattr(pipeline,'retrieve',lambda *args:xml.encode())
+    articles=pipeline.ingest({'id':'test','name':'Fixture publisher','rss':'https://publisher.example/rss','domains':['publisher.example']})
+    assert len(articles)==1
+    assert articles[0]['text']=='Current Atom evidence.'

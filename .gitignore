@@ -9,3 +9,4 @@ web/.next/
 
 # Original uploaded request stays local.
 docs/MASTER_SPEC.md
+publisher-import-results.json

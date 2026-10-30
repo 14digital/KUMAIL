@@ -46,9 +46,20 @@ def ingest(source):
         if urlsplit(url).scheme!='https' or urlsplit(url).hostname not in source['domains']:
             continue
         stamp = entry.get('published') or entry.get('updated')
+        parsed = entry.get('published_parsed') or entry.get('updated_parsed')
         try:
-            published = parsedate_to_datetime(stamp).astimezone(timezone.utc)
-        except (TypeError,ValueError,OverflowError):
+            if parsed:
+                import calendar
+                published = datetime.fromtimestamp(calendar.timegm(parsed), timezone.utc)
+            else:
+                try:
+                    published = parsedate_to_datetime(stamp)
+                except (TypeError, ValueError):
+                    published = datetime.fromisoformat(stamp.replace('Z', '+00:00'))
+                if published.tzinfo is None:
+                    published = published.replace(tzinfo=timezone.utc)
+                published = published.astimezone(timezone.utc)
+        except (AttributeError,TypeError,ValueError,OverflowError):
             continue
         if published < datetime.now(timezone.utc)-timedelta(days=2) or published > datetime.now(timezone.utc)+timedelta(minutes=10):
             continue

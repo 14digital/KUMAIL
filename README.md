@@ -32,6 +32,14 @@ Without API credentials, the application publishes clearly labelled feed excerpt
 
 A local `.env` with a random key may already have been created by the build session. Keep it private; do not commit it. All persistent state lives in ignored `state/` by default.
 
+## Import publisher feeds on Windows
+
+With the app already running, double-click **Import Publishers.cmd** in the same project folder. This uses `config/publisher-feeds.json` and the running API container; the importer itself does not require an image rebuild. It tests the exact supplied URLs using normal TLS verification and adds parsable, non-empty feeds with approved publisher links. Four checks run concurrently with bounded retrieval timeouts. Login pages, redirects, inaccessible endpoints and empty/unusable feeds remain unimported. Existing sources are preserved. Re-running is safe: the registry keys sources by the exact feed URL.
+
+A local `publisher-import-results.json` records per-feed results and check times. It is ignored by Git. A feed passing this check does not establish full-article permissions, date eligibility or three-source corroboration. Sources outside the 33-feed file have not been added. No paywall bypass or alternate source substitution is performed.
+
+After import, refresh **Sources**, then click **Prepare briefing**. Audio still requires ElevenLabs credentials. The news date parser supports both RSS dates and ISO/Atom dates; rebuild the app after updating backend code to use the latter fix.
+
 ## Containers
 
 ```sh
