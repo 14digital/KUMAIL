@@ -14,6 +14,18 @@ Scheduled readiness never starts playback. Audio is chaptered and cached, and lo
 
 The [JARVIS brief comparison](docs/KUMAIL_GAP_REVIEW.md) records what is still missing from the autonomous assistant vision.
 
+## All-source collection and listening-based curation
+
+Each enabled approved feed contributes **up to three qualifying new candidates** per run. A feed with too few new items, an invalid date or an access failure is reported honestly. The former eight-article edition cap and two-per-publisher-family cap are removed. Candidates are grouped into distinct developments, with all supporting article links retained; every selected distinct event reaches the listening edition. Editorial generation uses bounded batches, not a hidden final-story limit. Headline previews stay short. Broader coverage may exceed a target duration; nothing is silently dropped to fit ten minutes.
+
+Most RSS feeds do not publish readership metrics. Such items are ranked by relevance and freshness, explicitly labelled. A publisher's actual most-read RSS endpoint can be entered as the optional `popular_rss` field under Sources, on approved domains. Its live feed position and endpoint are retained as provenance; no view counts or cross-publisher popularity comparison are invented. A configured endpoint still depends on that publisher's actual access and ranking contract.
+
+URL/headline rules and optional AI-assisted event grouping consolidate overlapping reports, including paraphrases/languages when the AI grouping succeeds. The partition is validated so no candidate disappears. Similar country or team headlines are protected from simplistic merging. These are grouping heuristics, not independent verification. Materially changed source text is retained rather than suppressed merely because most wording is unchanged.
+
+Questions, repeats, completions, skips and seeks can contribute private inferred signals. At least three different article URLs are required before a bounded topic adjustment is used, with a 30-day half-life. A skip near the end is neutral; forward seeking alone is neutral. Explicit interests stay separate and carry more weight. Settings lets you review, disable or reset this history. Feed coverage remains intact while these signals adjust ordering. Full hierarchical interest learning and semantic cross-edition story timelines remain future work.
+
+On upgrading an existing installation, the scheduler queues one fresh **All-source Intelligence** edition automatically. It does not start playback. The edition may take several minutes to collect, group, edit and narrate.
+
 ## Windows: start with Docker Desktop
 
 1. Start Docker Desktop and wait for its engine to run. If it asks for a WSL update, run `wsl --update` in PowerShell and restart Windows.

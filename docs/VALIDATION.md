@@ -23,3 +23,12 @@ The development process group was started with `scripts/dev.sh`. Its random acce
 - Compose configuration was checked for the independent editorial worker, shared backend image and unchanged existing data volume.
 
 Browser audio fixtures are deliberately test-only WAV data, not a claimed ElevenLabs response. Speech recognition was simulated for deterministic browser tests. No live OpenAI/ElevenLabs request, actual Windows microphone test, always-on host deployment or notification delivery is claimed for this release. Listening duration and voice naturalness still need live acceptance with the user's approved sources and chosen voice.
+
+## All-source curation update
+
+- 62 backend tests passed: per-feed quotas, no global eight-story cap, a full 15-item collection-to-listening path, a 21-story edition, cross-publisher grouping, invalid-partition fallback, different-country/team safeguards, material-change retention, publisher-feed rank provenance, idempotent feedback, repeated-signal thresholds, decay, neutral forward seeks, opt-out/reset and actual effect on subsequent ranking.
+- Production Next.js build and TypeScript checks passed.
+- Chromium production acceptance retained playback/interruption/resume behaviour and confirmed skip/replay feedback requests carry the correct story IDs.
+- One-time automatic preparation after the curation upgrade was tested for idempotency.
+
+No live publisher popularity endpoint or live semantic-grouping quality is claimed from controlled tests. The supplied ordinary RSS feeds are not re-labelled as most-read feeds. Semantic event grouping remains model-assisted when configured, with conservative fallbacks.

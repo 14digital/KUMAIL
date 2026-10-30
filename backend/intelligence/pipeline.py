@@ -30,17 +30,26 @@ def schedule(at=None):
         store.enqueue('news','briefing.scheduled',{'id':key,'title':title,'scheduled_at':slot.isoformat()},key)
 
 
+def refresh_curation_on_upgrade():
+    editions=store.all_docs('briefings')
+    if not editions or editions[0].get('curation_version')=='all-sources-v2':return None
+    if not any(s.get('enabled',True) for s in store.all_docs('sources')):return None
+    key='curation-upgrade:all-sources-v2'
+    return store.enqueue('news','briefing.scheduled',{'id':key,'title':'All-source Intelligence','scheduled_at':now()},key)
+
+
 def clean(text):
     return html.unescape(re.sub('<[^>]*>',' ',text)).strip()
 
 
 def ingest(source):
-    data = retrieve(source['rss'],source['domains'])
+    endpoint=source.get('_endpoint',source['rss'])
+    data = retrieve(endpoint,source['domains'])
     feed = feedparser.parse(data)
     if feed.bozo and not feed.entries:
         raise ValueError('Invalid RSS feed')
     result=[]
-    for entry in feed.entries[:50]:
+    for rank,entry in enumerate(feed.entries[:50],1):
         url = entry.get('link','')
         from urllib.parse import urlsplit
         if urlsplit(url).scheme!='https' or urlsplit(url).hostname not in source['domains']:
@@ -64,11 +73,14 @@ def ingest(source):
         if published < datetime.now(timezone.utc)-timedelta(days=2) or published > datetime.now(timezone.utc)+timedelta(minutes=10):
             continue
         text = clean(entry.get('summary',''))[:8000]
-        digest=hashlib.sha256((url+'\n'+text).encode()).hexdigest()
+        from .curation import canonical_url
+        digest=hashlib.sha256((canonical_url(url)+'\n'+clean(entry.get('title','Untitled'))+'\n'+text).encode()).hexdigest()
         article={'id':digest,'url':url,'title':clean(entry.get('title','Untitled')),'text':text,
                  'publisher':source['name'],'source_id':source['id'],'published_at':published.isoformat(),
                  'retrieved_at':now(),'verification':'Publisher feed attribution; not independently corroborated',
-                 'opinion': bool(source.get('opinion',False)), 'author':entry.get('author')}
+                 'opinion': bool(source.get('opinion',False)), 'author':entry.get('author'),
+                 'categories':list(dict.fromkeys(source.get('categories',[])+[t.get('term','')[:80] for t in entry.get('tags',[]) if isinstance(t.get('term'),str) and t.get('term')]))[:20],
+                 **({'popularity_rank':rank,'popularity_provenance':endpoint,'popularity_checked_at':now()} if source.get('_popular') else {})}
         store.put('articles',digest,article)
         result.append(article)
     return result
@@ -109,35 +121,34 @@ def briefing(payload):
     if existing:
         publish_followups(existing)
         return existing
-    errors=[]
-    articles=[]
     from concurrent.futures import ThreadPoolExecutor
+    from .curation import collect_candidates,cluster_candidates,relevance
+    from .feedback import topic_adjustments
+    sources=[s for s in store.all_docs('sources') if s.get('enabled',True)]
     def collect(source):
-        try:return ingest(source),None
-        except Exception as exc:return [],{'source_id':source['id'],'error':type(exc).__name__}
-    with ThreadPoolExecutor(max_workers=4) as pool:
-        for found,error in pool.map(collect,[s for s in store.all_docs('sources') if s.get('enabled',True)]):
-            articles.extend(found)
-            if error:errors.append(error)
-    used={a['id'] for b in store.all_docs('briefings') for a in b.get('articles',[])}
+        found=[];errors=[]
+        for endpoint,popular in [(source['rss'],False)]+([(source['popular_rss'],True)] if source.get('popular_rss') else []):
+            try:found.extend(ingest({**source,'_endpoint':endpoint,'_popular':popular}))
+            except Exception as exc:errors.append('HTTP '+str(exc.response.status_code) if isinstance(exc,httpx.HTTPStatusError) else type(exc).__name__)
+        return source,found,','.join(errors) or None
+    with ThreadPoolExecutor(max_workers=4) as pool:collected=list(pool.map(collect,sources))
+    history=[a for b in store.all_docs('briefings') for a in b.get('articles',[])]
     preferences=store.get('preferences','user',{})
-    interests=preferences.get('interests',[])
-    articles={a['id']:a for a in articles if a['id'] not in used}
-    ranked=sorted(articles.values(),key=lambda a:(sum(s.lower() in (a['title']+' '+a['text']).lower() for s in interests),a['published_at']),reverse=True)
-    selected=[];families={};seen_titles=[]
-    for article in ranked:
-        publisher=article.get('publisher','')
-        family='BBC' if publisher.startswith('BBC') else publisher.split(' —')[0]
-        title_words=set(re.findall(r'\w+',article['title'].lower()))-{'the','a','an','and','to','in','of','for','on','as','is'}
-        if families.get(family,0)>=2 or any(len(title_words&other)/max(1,len(title_words|other))>.65 for other in seen_titles):continue
-        selected.append(article);seen_titles.append(title_words);families[family]=families.get(family,0)+1
-        if len(selected)>=8:break
+    adjustments=topic_adjustments()
+    candidates,coverage=collect_candidates(collected,history,preferences.get('interests',[]),adjustments)
+    groups,grouping_method=cluster_candidates(candidates,generate)
+    by_id={a['id']:a for a in candidates}
+    groups.sort(key=lambda g:(max(relevance(by_id[key],preferences.get('interests',[]),adjustments) for key in g['article_ids']),by_id[g['representative_id']].get('published_at','')),reverse=True)
+    selected=candidates
+    errors=[{'source_id':s['id'],'error':error} for s,_,error in collected if error]
     text='No new qualifying articles from approved sources.'
     method='Approved publisher evidence packet; listening edition prepares independently'
     if selected:
         text='\n\n'.join(a['title']+'\nPublisher excerpt: '+a['text'][:500] for a in selected)
-    result={**payload,'ready_at':now(),'articles':selected,'text':text,'ranking':'Relevance ranking; verified readership metrics unavailable',
-            'method':method,'source_errors':errors,'audio_status':'preparing_script'}
+    preview=' '.join(g['headline'].rstrip('.')+'.' for g in groups[:3])
+    if len(groups)>3:preview+=f' Plus {len(groups)-3} more distinct stories.'
+    result={**payload,'ready_at':now(),'headline_summary':preview,'articles':selected,'text':text,'ranking':'Publisher most-read order where explicitly configured; otherwise relevance and freshness. No cross-publisher readership comparison.',
+            'method':method,'source_errors':errors,'curation_version':'all-sources-v2','source_coverage':coverage,'candidate_count':sum(c['candidates'] for c in coverage),'unique_article_count':len(candidates),'story_groups':groups,'grouping_method':grouping_method,'unique_story_count':len(groups),'audio_status':'preparing_script'}
     store.put('briefings',payload['id'],result)
     publish_followups(result)
     return result

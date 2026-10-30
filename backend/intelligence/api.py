@@ -18,6 +18,7 @@ class Source(BaseModel):
     name:str=Field(min_length=1,max_length=100)
     domains:list[str]=Field(min_length=1,max_length=20)
     rss:str
+    popular_rss:str|None=None
     categories:list[str]=[]
     authors:list[str]=[]
     enabled:bool=True
@@ -44,6 +45,7 @@ class BriefingDurations(BaseModel):
 
 class Preferences(BaseModel):
     interests:list[str]=Field(default_factory=list,max_length=50)
+    adaptive_curation:bool=True
     notifications:bool=False
     research_mode:Literal['trusted','deep']='trusted'
     playback_speed:float=Field(default=1,ge=.5,le=2)
@@ -59,6 +61,29 @@ def dashboard():
             'answers':store.all_docs('answers')[:30], 'sources':store.all_docs('sources'),
             'preferences':store.get('preferences','user',{}), 'integrations':integration_status()}
 
+class Interaction(BaseModel):
+    id:str=Field(min_length=1,max_length=150)
+    briefing_id:str=Field(min_length=1,max_length=200)
+    article_id:str=Field(min_length=1,max_length=200)
+    action:Literal['question','replay','seek_backward','seek_forward','completed','skip']
+    progress:float=Field(default=0,ge=0,le=1)
+
+@app.post('/api/interactions',status_code=201)
+def interaction(body:Interaction):
+    from .feedback import record_interaction
+    try:return record_interaction(body.model_dump())
+    except ValueError as exc:raise HTTPException(422,str(exc)) from exc
+
+@app.get('/api/learning')
+def learning():
+    from .feedback import learning_summary
+    return learning_summary()
+
+@app.delete('/api/learning')
+def reset_learning():
+    with store.connect('interactions') as db:db.execute('DELETE FROM documents')
+    return {'status':'inferred listening history cleared; explicit interests unchanged'}
+
 @app.get('/api/integrations')
 def integration_status():
     return {'openai': 'configured_not_verified' if os.getenv('OPENAI_API_KEY') else 'not_configured',
@@ -70,6 +95,7 @@ def integration_status():
 def add_source(source:Source):
     try:
         approved_url(source.rss,source.domains)
+        if source.popular_rss:approved_url(source.popular_rss,source.domains)
     except (ValueError,OSError) as exc:
         raise HTTPException(422,'Source must use an approved public HTTPS domain') from exc
     key=hashlib.sha256(source.rss.encode()).hexdigest()
@@ -96,6 +122,9 @@ def ask(question:Question):
     elif question.article_id:
         raise HTTPException(422,'An article context requires its briefing')
     key=str(uuid.uuid4())
+    if question.briefing_id and question.article_id:
+        from .feedback import record_interaction
+        record_interaction({'id':'question:'+key,'briefing_id':question.briefing_id,'article_id':question.article_id,'action':'question','progress':0})
     store.enqueue('deep' if question.mode=='deep' else 'research','research.requested',{'id':key,**question.model_dump()},key)
     return {'id':key,'status':'queued','conversation_id':question.conversation_id}
 
@@ -131,7 +160,7 @@ def delete_answer(key:str):
 
 @app.get('/api/export')
 def export():
-    return {domain:store.all_docs(domain) for domain in ['documents','answers','preferences','sources']}
+    return {domain:store.all_docs(domain) for domain in ['documents','answers','preferences','sources','interactions']}
 
 class NarrationRequest(BaseModel):
     domain:Literal['briefings','answers']

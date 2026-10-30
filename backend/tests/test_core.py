@@ -61,8 +61,8 @@ def test_no_confirmation_without_review():
     assert verify_claim({'evidence':[{'source_id':s,'quote':'Evidence'} for s in sources]},sources)['status']=='Partially Verified'
 
 def test_publisher_failure_text_publication_and_dedup(monkeypatch):
-    store.put('sources','bad',{'id':'bad'})
-    store.put('sources','good',{'id':'good'})
+    store.put('sources','bad',{'id':'bad','rss':'https://bad.example/rss'})
+    store.put('sources','good',{'id':'good','rss':'https://good.example/rss'})
     article={'id':'a','title':'News','text':'A publisher excerpt','published_at':'2026-10-30','url':'https://example.com/a'}
     def ingest(s):
         if s['id']=='bad':raise RuntimeError('offline')
@@ -70,7 +70,7 @@ def test_publisher_failure_text_publication_and_dedup(monkeypatch):
     monkeypatch.setattr(pipeline,'ingest',ingest)
     first=pipeline.briefing({'id':'first'})
     assert len(first['articles'])==1 and len(first['source_errors'])==1
-    assert 'Relevance ranking' in first['ranking']
+    assert 'relevance and freshness' in first['ranking']
     assert pipeline.briefing({'id':'first'})==first
     second=pipeline.briefing({'id':'second'})
     assert second['articles']==[]

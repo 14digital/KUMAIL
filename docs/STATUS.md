@@ -1,5 +1,11 @@
 # KUMAIL implementation status
 
+## All-source curation update
+
+Every enabled feed now supplies up to three eligible new candidates before duplicate grouping. The publisher-family and eight-story edition caps are gone. All distinct grouped events are retained in the spoken edition, processed in bounded editorial batches. Per-feed counts and failure/ranking statuses are recorded. Publisher most-read order is used only for an explicitly configured publisher ranking feed; ordinary RSS does not imply verified popularity.
+
+Private question, replay, skip, completion and seek events feed small decaying topic adjustments after engagement with multiple articles. Forward seeks alone are neutral. Explicit interests remain separate; review, opt-out and reset controls are available. This is initial tag-based adaptation, not the full hierarchical memory system. AI-assisted grouping is a heuristic and is not a claim of independently verified facts or perfect semantic deduplication.
+
 ## Current listening release
 
 The UI is now a listening room with KUMAIL branding, one primary Play control, optional headline/evidence reading and settings/library tucked away. The separate editor worker creates original conversational scripts with source-attributed chapter metadata. Narration never uses the analyst record directly. Edition-specific duration targets are adjustable; thin evidence produces a shorter edition or labelled headline fallback. Audio is split without truncation, cached by script and delivered as ordered chapters.

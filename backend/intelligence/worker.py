@@ -58,6 +58,9 @@ def consume(role):
 
 def main():
     role=os.getenv('SERVICE_ROLE','news')
+    if role=='scheduler':
+        from .pipeline import refresh_curation_on_upgrade
+        refresh_curation_on_upgrade()
     if role=='voice':
         from .narration import recover_unavailable_audio
         recover_unavailable_audio()

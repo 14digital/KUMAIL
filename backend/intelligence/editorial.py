@@ -69,6 +69,7 @@ def build_briefing_presentation(record,generator=None):
     if generator is None:
         from .pipeline import generate
         generator=generate
+    if record.get('story_groups'):return build_grouped_presentation(record,generator)
     minutes=target_minutes(record)
     sources=[s for s in record.get('articles',[]) if s.get('id') and s.get('title')][:8]
     if not sources:
@@ -79,12 +80,13 @@ def build_briefing_presentation(record,generator=None):
     context=[{k:s.get(k) for k in ('id','title','publisher','published_at','opinion')} | {'excerpt':s.get('text','')[:2500]} for s in sources]
     evidence_words=sum(len(s['excerpt'].split()) for s in context)
     target_words=min(minutes*145,max(100,round(evidence_words*1.5)))
+    if record.get('_spoken_word_budget'):target_words=record['_spoken_word_budget']
     preferences=store.get('preferences','user',{})
     prompt=f'''You are KUMAIL, a personal intelligence assistant. Create an original, natural spoken news edition in clear British English for one listener. Target around {target_words} spoken words across all stories.
 The target is {minutes} minutes at about 145 words per minute, only when the supplied evidence supports it. A shorter honest edition is better than repetition, invented background or filler.
-Open with a brief human introduction. Cover the material developments, what they mean and uncertainty in plain conversation. Use smooth transitions. Do not announce analytical section labels, repeat headings, recite hashes, URLs or a bibliography. Attribute naturally to a publisher when useful. Do not force a commercial opportunity into unrelated stories. Only explicitly supplied interests are personal context. Distinguish reporting, opinion and hypotheses.
+Open with a brief human introduction. Cover the material developments, what they mean and uncertainty in plain conversation. Use smooth transitions. Do not announce analytical section labels, repeat headings, recite hashes, URLs or a bibliography. Attribute naturally to a publisher when useful. Do not force a commercial opportunity into unrelated stories. Only explicitly supplied interests are personal context. Distinguish reporting, opinion and hypotheses. Where supplied reports disagree, disclose the disagreement and dates rather than silently blending incompatible claims.
 Return JSON only: {{"intro":"spoken introduction", "stories":[{{"source_ids":["exact supplied id"],"headline":"short headline","summary":"one short original paragraph for optional reading","script":"conversational spoken paragraphs"}}],"outro":"brief closing"}}.
-Cover each supplied source story once, or combine truly overlapping stories with their exact source_ids. IDs belong only in source_ids; never in spoken fields. Never claim independent confirmation that the evidence does not establish. Do not instruct the listener to say a wake phrase.'''
+Cover each supplied source story once, or combine truly overlapping stories with their exact source_ids. IDs belong only in source_ids; never in spoken fields. Never claim independent confirmation that the evidence does not establish. Do not instruct the listener to say a wake phrase. Do not number stories or announce batch boundaries. Keep each supplied ID as its own story when it represents an already grouped event.'''
     output=generator(prompt,json.dumps({'sources':context,'explicit_interests':preferences.get('interests',[])},ensure_ascii=False),max_output_tokens=6000,spoken=True)
     edition=None
     if output:
@@ -94,6 +96,7 @@ Cover each supplied source story once, or combine truly overlapping stories with
             allowed={s['id'] for s in sources}
             seen=set()
             for story in edition.stories:
+                if record.get('_distinct_groups') and len(story.source_ids)!=1:raise ValueError('Distinct events merged')
                 if not set(story.source_ids)<=allowed or seen.intersection(story.source_ids):
                     raise ValueError('Unsupported or repeated story attribution')
                 if not speech_text(story.script) or not speech_text(story.headline):raise ValueError('Empty spoken story')
@@ -116,6 +119,42 @@ Cover each supplied source story once, or combine truly overlapping stories with
     return {'presentation_version':PRESENTATION_VERSION,'headline_summary':headline_summary,'stories':stories,
             'narration_script':narration,'narration_segments':segments,'estimated_duration_seconds':sum(s['estimated_seconds'] for s in segments),
             'target_duration_seconds':minutes*60,'narration_method':method}
+
+
+def build_grouped_presentation(record,generator):
+    articles={a['id']:a for a in record['articles']}
+    groups=record['story_groups']
+    minutes=target_minutes(record)
+    per_story=max(12,round(minutes*145/max(1,len(groups))))
+    stories=[];segments=[];methods=[]
+    for start in range(0,len(groups),8):
+        batch=groups[start:start+8]
+        aliases={f'g{start+i}':group for i,group in enumerate(batch)}
+        sources=[]
+        for alias,group in aliases.items():
+            primary=articles[group['representative_id']]
+            other=[articles[key] for key in group['article_ids'] if key!=primary['id']][:6]
+            evidence=primary.get('text','')[:1000]
+            for source in other:evidence+='\nAdditional attributed reporting: '+source.get('publisher','')+' ('+source.get('published_at','date unavailable')+'): '+source['title']+'. '+source.get('text','')[:180]
+            sources.append({**primary,'id':alias,'text':evidence})
+        result=build_briefing_presentation({k:v for k,v in record.items() if k!='story_groups'} | {'articles':sources,'_spoken_word_budget':per_story*len(batch),'_distinct_groups':True},generator)
+        methods.append(result['narration_method'])
+        for item in result['narration_segments']:
+            if item.get('story_index') is None:
+                if item['title']=='Your briefing' and start==0:segments.append(item)
+                elif item['title']=='The outlook' and start+len(batch)==len(groups):segments.append(item)
+                continue
+            local_story=result['stories'][item['story_index']]
+            group=aliases[local_story['source_ids'][0]]
+            metadata={**local_story,'source_ids':group['article_ids'],'story_id':group['id']}
+            index=len(stories);stories.append(metadata)
+            segments.append({**item,'source_ids':group['article_ids'],'story_index':index})
+    headlines=' '.join(s['headline'].rstrip('.')+'.' for s in stories[:3])
+    if len(stories)>3:headlines+=f' Plus {len(stories)-3} more distinct stories.'
+    return {'presentation_version':PRESENTATION_VERSION,'headline_summary':headlines,'stories':stories,
+            'narration_script':'\n\n'.join(s['text'] for s in segments),'narration_segments':segments,
+            'estimated_duration_seconds':sum(s['estimated_seconds'] for s in segments),'target_duration_seconds':minutes*60,
+            'narration_method':'All-source conversational briefing' if all('Original' in m for m in methods) else 'All-source briefing with short headline fallbacks where editing was unavailable'}
 
 
 def build_answer_presentation(record,generator=None):
