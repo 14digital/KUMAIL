@@ -1,0 +1,48 @@
+x-backend: &backend
+  build: .
+  env_file: .env
+  environment:
+    STATE_DIR: /data
+  volumes: [intelligence-data:/data]
+  restart: unless-stopped
+  init: true
+services:
+  api:
+    <<: *backend
+    ports: ["127.0.0.1:8000:8000"]
+    healthcheck:
+      test: [CMD, python, -c, "import os,urllib.request; r=urllib.request.Request('http://localhost:8000/health',headers={'Authorization':'Bearer '+os.environ['APP_TOKEN']}); urllib.request.urlopen(r)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+  news:
+    <<: *backend
+    command: [python, -m, intelligence.worker]
+    environment: {STATE_DIR: /data, SERVICE_ROLE: news}
+  scheduler:
+    <<: *backend
+    command: [python, -m, intelligence.worker]
+    environment: {STATE_DIR: /data, SERVICE_ROLE: scheduler}
+  voice:
+    <<: *backend
+    command: [python, -m, intelligence.worker]
+    environment: {STATE_DIR: /data, SERVICE_ROLE: voice}
+  research:
+    <<: *backend
+    command: [python, -m, intelligence.worker]
+    environment: {STATE_DIR: /data, SERVICE_ROLE: research}
+  deep:
+    <<: *backend
+    command: [python, -m, intelligence.worker]
+    environment: {STATE_DIR: /data, SERVICE_ROLE: deep}
+  opportunities:
+    <<: *backend
+    command: [python, -m, intelligence.worker]
+    environment: {STATE_DIR: /data, SERVICE_ROLE: opportunities}
+  web:
+    build: ./web
+    environment: {API_URL: 'http://api:8000'}
+    ports: ["127.0.0.1:3000:3000"]
+    restart: unless-stopped
+volumes:
+  intelligence-data:

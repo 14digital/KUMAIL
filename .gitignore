@@ -1,0 +1,11 @@
+.venv/
+__pycache__/
+.pytest_cache/
+.env
+state/
+web/node_modules/
+web/.next/
+*.tsbuildinfo
+
+# Original uploaded request stays local.
+docs/MASTER_SPEC.md

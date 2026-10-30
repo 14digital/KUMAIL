@@ -1,0 +1,6 @@
+.git
+.venv
+state
+web/node_modules
+web/.next
+.env

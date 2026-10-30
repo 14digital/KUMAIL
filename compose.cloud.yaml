@@ -1,0 +1,43 @@
+# Managed-cloud trust and network override. Use with compose.yaml.
+x-cloud-build: &cloud-build
+  context: .
+  secrets: [proxy_ca]
+x-cloud-env: &cloud-env
+  HTTP_PROXY: ${HTTP_PROXY}
+  HTTPS_PROXY: ${HTTPS_PROXY}
+  NO_PROXY: localhost,127.0.0.1,api,web
+  SSL_CERT_FILE: /run/cloud-ca.pem
+services:
+  api:
+    build: *cloud-build
+    environment: *cloud-env
+    volumes: [/etc/ssl/certs/ca-certificates.crt:/run/cloud-ca.pem:ro]
+  news:
+    build: *cloud-build
+    environment: *cloud-env
+    volumes: [/etc/ssl/certs/ca-certificates.crt:/run/cloud-ca.pem:ro]
+  voice:
+    build: *cloud-build
+    environment: *cloud-env
+    volumes: [/etc/ssl/certs/ca-certificates.crt:/run/cloud-ca.pem:ro]
+  research:
+    build: *cloud-build
+    environment: *cloud-env
+    volumes: [/etc/ssl/certs/ca-certificates.crt:/run/cloud-ca.pem:ro]
+  deep:
+    build: *cloud-build
+    environment: *cloud-env
+    volumes: [/etc/ssl/certs/ca-certificates.crt:/run/cloud-ca.pem:ro]
+  opportunities:
+    build: *cloud-build
+    environment: *cloud-env
+    volumes: [/etc/ssl/certs/ca-certificates.crt:/run/cloud-ca.pem:ro]
+  scheduler:
+    build: *cloud-build
+  web:
+    build:
+      context: ./web
+      secrets: [proxy_ca]
+secrets:
+  proxy_ca:
+    file: /etc/ssl/certs/ca-certificates.crt
