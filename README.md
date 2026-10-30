@@ -38,6 +38,14 @@ Without API credentials, the application publishes clearly labelled feed excerpt
 
 A local `.env` with a random key may already have been created by the build session. Keep it private; do not commit it. All persistent state lives in ignored `state/` by default.
 
+## Audio unavailable after adding ElevenLabs keys
+
+Save `.env` with `ELEVENLABS_API_KEY` and `ELEVENLABS_VOICE_ID`, then run **Update My Intelligence.cmd** so containers load those values. On startup the voice worker queues the latest eligible briefing and latest answer previously marked unavailable. It skips empty news editions and does not replay the whole archive.
+
+For a failed or older report, choose **Generate / Retry audio** under the briefing or in **Read & Verify**. Written content is preserved. The app shows controlled error guidance for invalid keys, permissions, unavailable voices, quota and transient provider errors. Permanent configuration/account errors stop automatic retries; transient failures retry at most four times. No audio plays automatically.
+
+**Operations** reports only whether the voice worker loaded each required variable, never its value. Never share `.env` or key screenshots. Provider errors are classified without storing or displaying their raw response bodies. A configured key is not a verified live connection until narration actually succeeds.
+
 ## Import publisher feeds on Windows
 
 With the app already running, double-click **Import Publishers.cmd** in the same project folder. This uses `config/publisher-feeds.json` and the running API container; the importer itself does not require an image rebuild. It tests the exact supplied URLs using normal TLS verification and adds parsable, non-empty feeds with approved publisher links. Four checks run concurrently with bounded retrieval timeouts. Login pages, redirects, inaccessible endpoints and empty/unusable feeds remain unimported. Existing sources are preserved. Re-running is safe: the registry keys sources by the exact feed URL.

@@ -116,6 +116,30 @@ def delete_answer(key:str):
 def export():
     return {domain:store.all_docs(domain) for domain in ['documents','answers','preferences','sources']}
 
+class NarrationRequest(BaseModel):
+    domain:Literal['briefings','answers']
+    id:str=Field(min_length=1,max_length=200)
+
+
+@app.post('/api/narration',status_code=202)
+def request_narration(body:NarrationRequest):
+    from .narration import queue_audio
+    record=store.get(body.domain,body.id)
+    if not record:
+        raise HTTPException(404,'Completed written report not found')
+    if not os.getenv('ELEVENLABS_API_KEY','').strip() or not os.getenv('ELEVENLABS_VOICE_ID','').strip():
+        raise HTTPException(503,'ElevenLabs key or voice ID is not loaded in the app. Save .env and run Update My Intelligence.cmd, then retry audio.')
+    if not record.get('text','').strip():
+        raise HTTPException(422,'There is no completed text to narrate')
+    if record.get('audio_status')=='ready' and record.get('audio_file') and (store.ROOT/'audio'/record['audio_file']).is_file():
+        return {'id':body.id,'status':'ready'}
+    # Mark queued before making a new job visible; a fast cache hit must not be
+    # overwritten back to queued after the worker has saved its ready result.
+    store.put(body.domain,body.id,{**record,'audio_status':'queued','audio_reason':'Narration queued. Playback starts when you press Play.'})
+    job_id=queue_audio(body.domain,body.id,record['text'])
+    return {'id':body.id,'status':'queued','job_id':job_id}
+
+
 @app.get('/api/audio/{filename}')
 def audio(filename:str):
     if len(filename)!=68 or not filename.endswith('.mp3') or any(c not in '0123456789abcdef' for c in filename[:-4]):

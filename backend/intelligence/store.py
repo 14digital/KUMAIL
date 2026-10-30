@@ -72,11 +72,11 @@ def claim(queue, lease_seconds=180):
         return result
 
 
-def finish(job, error=None):
+def finish(job, error=None, terminal=False):
     with broker() as db:
         if error:
             db.execute('UPDATE jobs SET status=?,error=?,available=?,lease=0 WHERE id=? AND attempts=?',
-                       ('dead' if job['attempts'] >= 4 else 'pending', str(error)[:300],time.time()+min(300,2**job['attempts']),job['id'],job['attempts']))
+                       ('dead' if terminal or job['attempts'] >= 4 else 'pending', str(error)[:300],time.time()+min(300,2**job['attempts']),job['id'],job['attempts']))
         else:
             db.execute("UPDATE jobs SET status='done',lease=0,error=NULL WHERE id=? AND attempts=?", (job['id'],job['attempts']))
 

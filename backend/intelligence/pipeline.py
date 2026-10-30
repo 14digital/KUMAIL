@@ -137,25 +137,38 @@ def briefing(payload):
 
 
 def narrate(payload):
-    key=os.getenv('ELEVENLABS_API_KEY'); voice=os.getenv('ELEVENLABS_VOICE_ID')
+    key=os.getenv('ELEVENLABS_API_KEY','').strip(); voice=os.getenv('ELEVENLABS_VOICE_ID','').strip()
     domain=payload['domain']; record=store.get(domain,payload['id'])
     if not record:
         raise ValueError('Missing completed text')
     if not key or not voice:
         store.put(domain,payload['id'],{**record,'audio_status':'unavailable','audio_reason':'ElevenLabs credentials and voice required'})
         return
+    from .narration import NarrationError, provider_error
+    from urllib.parse import quote
+    store.put(domain,payload['id'],{**record,'audio_status':'generating','audio_reason':'ElevenLabs narration is being generated.'})
     name=hashlib.sha256((voice+payload['text']).encode()).hexdigest()+'.mp3'
     path=store.ROOT/'audio'/name; path.parent.mkdir(exist_ok=True)
     try:
-        if not path.exists():
+        if not path.exists() or path.stat().st_size==0:
             with httpx.Client(timeout=75) as client:
-                r=client.post('https://api.elevenlabs.io/v1/text-to-speech/'+voice,headers={'xi-api-key':key},json={'text':payload['text'][:12000],'model_id':'eleven_multilingual_v2'})
+                r=client.post('https://api.elevenlabs.io/v1/text-to-speech/'+quote(voice,safe=''),headers={'xi-api-key':key},json={'text':payload['text'][:12000],'model_id':'eleven_multilingual_v2'})
                 r.raise_for_status()
                 if not r.headers.get('content-type','').startswith('audio/'):
                     raise ValueError('Provider did not return audio')
+                if not r.content:
+                    raise ValueError('Provider returned empty audio')
                 temp=path.with_suffix('.tmp'); temp.write_bytes(r.content); temp.replace(path)
             store.put('usage',str(time.time_ns()),{'provider':'ElevenLabs','characters':min(len(payload['text']),12000),'at':now(),'cost':None})
-        store.put(domain,payload['id'],{**record,'audio_status':'ready','audio_file':name})
+        store.put(domain,payload['id'],{**record,'audio_status':'ready','audio_file':name,'audio_reason':None,'audio_retry_pending':False})
+    except httpx.HTTPStatusError as exc:
+        fault=provider_error(exc.response)
+        store.put(domain,payload['id'],{**record,'audio_status':'failed','audio_reason':fault.reason,'audio_error_code':fault.code,'audio_retry_pending':fault.retryable})
+        raise fault from None
+    except httpx.RequestError:
+        fault=NarrationError('The narration worker could not reach ElevenLabs. Check Internet access; a bounded retry will be attempted.',True,'network_error')
+        store.put(domain,payload['id'],{**record,'audio_status':'failed','audio_reason':fault.reason,'audio_error_code':fault.code,'audio_retry_pending':True})
+        raise fault from None
     except Exception:
-        store.put(domain,payload['id'],{**record,'audio_status':'failed','audio_reason':'Provider failed; retry queued'})
+        store.put(domain,payload['id'],{**record,'audio_status':'failed','audio_reason':'Narration could not save a valid audio asset. A bounded retry will be attempted.','audio_retry_pending':True})
         raise
