@@ -18,6 +18,12 @@ def now():
     return datetime.now(timezone.utc).isoformat()
 
 
+def briefing_generation_allowed(record_id):
+    if not record_id.startswith(('edition:','curation-upgrade:')):return True
+    return bool(store.get('preferences','user',{}).get('automatic_briefings',False) or
+                store.get('briefings',record_id,{}).get('manual_audio_requested',False))
+
+
 def due_slots(at):
     local = at.astimezone(ZoneInfo('Asia/Muscat'))
     # Catch up all today's elapsed editions; unique queue IDs prevent replay.
@@ -25,12 +31,17 @@ def due_slots(at):
 
 
 def schedule(at=None):
+    preferences=store.get('preferences','user',{})
+    if not preferences.get('automatic_briefings',False):return
     for slot,title in due_slots(at or datetime.now(timezone.utc)):
+        enabled_at=preferences.get('automatic_briefings_enabled_at')
+        if enabled_at and slot<datetime.fromisoformat(enabled_at):continue
         key = 'edition:'+slot.isoformat()
         store.enqueue('news','briefing.scheduled',{'id':key,'title':title,'scheduled_at':slot.isoformat()},key)
 
 
 def refresh_curation_on_upgrade():
+    if not store.get('preferences','user',{}).get('automatic_briefings',False):return None
     editions=store.all_docs('briefings')
     if not editions or editions[0].get('curation_version')=='all-sources-v2':return None
     if not any(s.get('enabled',True) for s in store.all_docs('sources')):return None
@@ -117,6 +128,7 @@ def publish_followups(result):
 
 
 def briefing(payload):
+    if not briefing_generation_allowed(payload['id']):return None
     existing=store.get('briefings',payload['id'])
     if existing:
         publish_followups(existing)
@@ -155,6 +167,9 @@ def briefing(payload):
 
 
 def narrate(payload):
+    if payload['domain']=='briefings' and not briefing_generation_allowed(payload['id']):
+        store.patch('briefings',payload['id'],{'audio_status':'not_requested','audio_reason':'Automatic briefings are off. Prepare audio when you want to listen.'})
+        return
     key=os.getenv('ELEVENLABS_API_KEY','').strip(); voice=os.getenv('ELEVENLABS_VOICE_ID','').strip()
     domain=payload['domain']; record=store.get(domain,payload['id'])
     if not record:
@@ -187,6 +202,9 @@ def narrate(payload):
                     chunks.append(remaining[:cut].strip());remaining=remaining[cut:].strip()
                 if remaining:chunks.append(remaining)
                 for chunk in chunks:
+                    if domain=='briefings' and not briefing_generation_allowed(payload['id']):
+                        store.patch(domain,payload['id'],{'audio_status':'not_requested','audio_reason':'Automatic briefings are off. Prepare audio when you want to listen.'})
+                        return
                     name=hashlib.sha256((PRESENTATION_VERSION+'\n'+voice+'\n'+chunk).encode()).hexdigest()+'.mp3'
                     path=folder/name
                     if not path.exists() or path.stat().st_size==0:

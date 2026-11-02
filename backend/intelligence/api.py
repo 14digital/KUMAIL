@@ -44,6 +44,7 @@ class BriefingDurations(BaseModel):
     manual:int=Field(default=10,ge=2,le=15)
 
 class Preferences(BaseModel):
+    automatic_briefings:bool=False
     interests:list[str]=Field(default_factory=list,max_length=50)
     adaptive_curation:bool=True
     notifications:bool=False
@@ -135,7 +136,11 @@ def answer(key:str):
 
 @app.put('/api/preferences')
 def preferences(body:Preferences):
-    return store.put('preferences','user',body.model_dump())
+    previous=store.get('preferences','user',{})
+    fields=body.model_dump()
+    if body.automatic_briefings:
+        fields['automatic_briefings_enabled_at']=previous.get('automatic_briefings_enabled_at',now()) if previous.get('automatic_briefings') else now()
+    return store.put('preferences','user',fields)
 
 @app.post('/api/documents',status_code=201)
 def document(body:Document):
@@ -178,6 +183,7 @@ def request_narration(body:NarrationRequest):
     if not record.get('text','').strip():
         raise HTTPException(422,'There is no completed text to narrate')
     from .editorial import PRESENTATION_VERSION,queue_presentation
+    store.patch(body.domain,body.id,{'manual_audio_requested':True})
     if record.get('presentation_version')!=PRESENTATION_VERSION or not record.get('narration_script'):
         store.patch(body.domain,body.id,{'audio_status':'preparing_script','audio_reason':'Preparing your conversational listening edition.'})
         job_id=queue_presentation(body.domain,body.id,force=True)

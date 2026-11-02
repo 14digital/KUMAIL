@@ -58,6 +58,7 @@ def recover_unavailable_audio():
         return []
     recovered=[]
     for domain in ('briefings','answers'):
+        if domain=='briefings' and not store.get('preferences','user',{}).get('automatic_briefings',False):continue
         # An older archive remains available for user-triggered retries.
         eligible=[r for r in store.all_docs(domain) if r.get('text') and (domain!='briefings' or r.get('articles'))]
         if not eligible:

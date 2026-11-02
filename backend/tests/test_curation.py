@@ -151,6 +151,7 @@ def test_learning_can_be_disabled_without_storing_new_signals():
 
 
 def test_upgrade_prepares_one_fresh_edition_automatically():
+    store.put('preferences','user',{'automatic_briefings':True})
     store.put('sources','feed',{'id':'feed','enabled':True})
     store.put('briefings','old',{'id':'old','articles':[]})
     first=pipeline.refresh_curation_on_upgrade()

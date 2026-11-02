@@ -181,6 +181,10 @@ def queue_presentation(domain,record_id,force=False):
 
 
 def prepare_presentation(payload):
+    from .pipeline import briefing_generation_allowed
+    if payload['domain']=='briefings' and not briefing_generation_allowed(payload['id']):
+        store.patch('briefings',payload['id'],{'audio_status':'not_requested','audio_reason':'Automatic briefings are off. Prepare audio when you want to listen.'})
+        return
     domain=payload['domain'];record=store.get(domain,payload['id'])
     if not record: return
     if record.get('presentation_version')!=PRESENTATION_VERSION or not record.get('narration_script'):
@@ -189,5 +193,9 @@ def prepare_presentation(payload):
                 'audio_reason':'The spoken edition is ready; ElevenLabs audio is queued.','presentation_ready_at':datetime.now(timezone.utc).isoformat()}
         store.put(domain,payload['id'],record)
     if record.get('audio_status') not in ('ready','failed'):
+        if record.get('manual_audio_requested'):
+            from .narration import queue_audio
+            queue_audio(domain,payload['id'],record['narration_script'])
+            return
         store.enqueue('answer_voice' if domain=='answers' else 'voice','audio.generation.requested',{'domain':domain,'id':payload['id'],'text':record['narration_script']},
                       'voice:'+PRESENTATION_VERSION+':'+domain+':'+payload['id'])

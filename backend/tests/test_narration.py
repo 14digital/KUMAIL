@@ -45,6 +45,8 @@ def test_restart_recovers_latest_unavailable_content_only(monkeypatch):
     record()
     assert recover_unavailable_audio()==[]
     configured(monkeypatch)
+    assert recover_unavailable_audio()==[]
+    store.put('preferences','user',{'automatic_briefings':True})
     store.put('briefings','empty',{'id':'empty','text':'No new articles','articles':[],'audio_status':'unavailable'})
     assert len(recover_unavailable_audio())==1
     assert store.get('briefings','b')['audio_status']=='queued'

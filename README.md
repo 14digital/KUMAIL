@@ -24,7 +24,9 @@ URL/headline rules and optional AI-assisted event grouping consolidate overlappi
 
 Questions, repeats, completions, skips and seeks can contribute private inferred signals. At least three different article URLs are required before a bounded topic adjustment is used, with a 30-day half-life. A skip near the end is neutral; forward seeking alone is neutral. Explicit interests stay separate and carry more weight. Settings lets you review, disable or reset this history. Feed coverage remains intact while these signals adjust ordering. Full hierarchical interest learning and semantic cross-edition story timelines remain future work.
 
-On upgrading an existing installation, the scheduler queues one fresh **All-source Intelligence** edition automatically. It does not start playback. The edition may take several minutes to collect, group, edit and narrate.
+**Automatic briefings are off by default**, including on existing installations. Use **Prepare briefing** on the listening screen to generate an edition on demand. Enable the **Automatic briefings** switch to generate editions at 07:00, 11:00, 15:00 and 21:00 Muscat time while the computer is awake and Docker is running. Enabling starts with upcoming slots; it does not catch up earlier editions that day. Scheduled audio consumes ElevenLabs credits even if you do not listen. Disabling stops further automatic audio requests; an already in-flight request may still finish and be charged. Saved audio remains replayable.
+
+When automatic briefings are enabled, upgrading an existing installation may queue one fresh **All-source Intelligence** edition. It does not start playback. The edition may take several minutes to collect, group, edit and narrate.
 
 ## Windows: start with Docker Desktop
 

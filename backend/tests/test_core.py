@@ -25,6 +25,7 @@ def test_oman_schedule_and_redelivery():
     slots=pipeline.due_slots(at)
     assert [s.hour for s,_ in slots]==[7,11]
     assert str(slots[0][0].utcoffset())=='4:00:00'
+    store.put('preferences','user',{'automatic_briefings':True})
     pipeline.schedule(at);pipeline.schedule(at)
     assert len(store.jobs())==2
 
@@ -151,3 +152,74 @@ def test_atom_iso_dates_are_eligible(monkeypatch):
     articles=pipeline.ingest({'id':'test','name':'Fixture publisher','rss':'https://publisher.example/rss','domains':['publisher.example']})
     assert len(articles)==1
     assert articles[0]['text']=='Current Atom evidence.'
+
+
+def test_automatic_briefings_default_off_and_manual_still_available(client):
+    at=datetime(2026,10,30,12,0,tzinfo=timezone.utc)
+    pipeline.schedule(at)
+    store.put('sources','feed',{'enabled':True})
+    store.put('briefings','old',{'id':'old'})
+    assert pipeline.refresh_curation_on_upgrade() is None
+    assert store.jobs()==[]
+    assert client.put('/api/preferences',json={}).json()['automatic_briefings'] is False
+    response=client.post('/api/briefings')
+    assert response.status_code==202 and response.json()['id'].startswith('manual:')
+    assert len(store.jobs())==1
+
+
+def test_enabling_only_schedules_upcoming_slots_and_disabling_stops(client,monkeypatch):
+    monkeypatch.setattr(pipeline,'now',lambda:'2026-10-30T08:00:00+00:00')
+    # The API owns the enable timestamp; it cannot be overridden by the client.
+    monkeypatch.setattr('intelligence.api.now',lambda:'2026-10-30T08:00:00+00:00')
+    assert client.put('/api/preferences',json={'automatic_briefings':True}).status_code==200
+    pipeline.schedule(datetime(2026,10,30,12,0,tzinfo=timezone.utc))
+    assert len(store.jobs())==1
+    assert '15:00:00' in store.jobs()[0]['id']
+    client.put('/api/preferences',json={'automatic_briefings':False})
+    pipeline.schedule(datetime(2026,10,30,22,0,tzinfo=timezone.utc))
+    assert len(store.jobs())==1
+
+
+def test_off_blocks_previously_queued_scheduled_work(monkeypatch):
+    from intelligence.editorial import prepare_presentation
+    key='edition:2026-10-30T07:00:00+04:00'
+    monkeypatch.setattr(pipeline,'ingest',lambda *a:pytest.fail('No automatic feed collection'))
+    monkeypatch.setattr(pipeline,'generate',lambda *a,**kw:pytest.fail('No automatic model call'))
+    assert pipeline.briefing({'id':key}) is None
+    store.put('briefings',key,{'id':key,'text':'Saved evidence','articles':[{'id':'a','title':'Story'}]})
+    payload={'domain':'briefings','id':key}
+    prepare_presentation(payload)
+    pipeline.narrate(payload)
+    assert store.jobs()==[]
+    assert store.get('briefings',key)['audio_status']=='not_requested'
+
+
+def test_manual_audio_request_can_prepare_an_old_scheduled_edition(client,monkeypatch):
+    from intelligence.editorial import prepare_presentation
+    key='edition:2026-10-30T07:00:00+04:00'
+    store.put('briefings',key,{'id':key,'text':'Saved evidence','articles':[{'id':'a','title':'Story'}]})
+    monkeypatch.setenv('ELEVENLABS_API_KEY','fixture')
+    monkeypatch.setenv('ELEVENLABS_VOICE_ID','fixture')
+    response=client.post('/api/narration',json={'domain':'briefings','id':key})
+    assert response.status_code==202
+    assert pipeline.briefing_generation_allowed(key)
+    prepare_presentation({'domain':'briefings','id':key})
+    assert any(job['queue']=='voice' for job in store.jobs())
+
+
+def test_switching_off_stops_remaining_scheduled_audio_chunks(monkeypatch):
+    import httpx
+    key='edition:2026-10-30T07:00:00+04:00'
+    store.put('preferences','user',{'automatic_briefings':True})
+    store.put('briefings',key,{'id':key,'text':'Written evidence','presentation_version':'spoken-v1','narration_script':'First. Second.','narration_segments':[{'text':'First.'},{'text':'Second.'}]})
+    monkeypatch.setenv('ELEVENLABS_API_KEY','fixture')
+    monkeypatch.setenv('ELEVENLABS_VOICE_ID','fixture')
+    calls=[]
+    def provider(*args,**kwargs):
+        calls.append(kwargs['json']['text'])
+        store.put('preferences','user',{'automatic_briefings':False})
+        return httpx.Response(200,content=b'ID3-fixture',headers={'content-type':'audio/mpeg'},request=httpx.Request('POST','https://api.elevenlabs.io'))
+    monkeypatch.setattr(pipeline.httpx.Client,'post',provider)
+    pipeline.narrate({'domain':'briefings','id':key})
+    assert calls==['First.']
+    assert store.get('briefings',key)['audio_status']=='not_requested'
